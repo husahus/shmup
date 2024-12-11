@@ -1,0 +1,366 @@
+import pygame
+
+from settings import*
+
+
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+
+
+class Player(pygame.sprite.Sprite):
+    def __init__(self, fighter_img):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.transform.scale(fighter_img, (50, 38))
+        self.image.set_colorkey(BLACK)
+        self.rect = self.image.get_rect()
+        self.radius = 20
+        #pygame draw circle(self.image, RED, self. rect.center, self.radius)
+        self.rect.centerx = SCREEN_WIDTH / 2
+        self.rect.centery = SCREEN_HEIGHT - 10
+        self.speedy = 0
+        self.speedx = 0
+        self.shield = 100
+        self.shoot_delay = 250
+        self.last_shot = pygame.time.get_ticks()
+        self.lives = 3
+        self.hidden = False
+        self.hide_timer = pygame.time.get_ticks()
+        self.power = 1
+        self.power_time = pygame.time.get_ticks()
+
+    def update(self):
+        #timeout for powerups
+        if self.power >= 2 and pygame.time.get_ticks() - self.power_time > POWERUP_TIME:
+            self.power -= 1
+            self.power_time = pygame.time.get_ticks()
+
+        #Unhide if hidden
+        if self.hidden and pygame.time.get_ticks() - self.hide_timer > 1000:
+            self.hidden = False
+            self.rect.centerx = SCREEN_WIDTH / 2
+            self.rect.bottom = SCREEN_HEIGHT - 10
+
+        self.speedx = 0
+        self.speedy = 0
+        keystate = pygame.key.get_pressed()
+        if keystate[pygame.K_LEFT]:
+            self.speedx = -8
+        if keystate[pygame.K_RIGHT]:
+            self.speedx = 8
+        if keystate[pygame.K_SPACE]:
+            self.shoot()
+        if keystate[pygame.K_UP]:
+            self.speedy = -5
+        if keystate[pygame.K_DOWN]:
+            self.speedy = 5
+        self.rect.x += self.speedx
+        self.rect.y += self.speedy
+
+        if self.rect.right > SCREEN_WIDTH:
+            self.rect.right = SCREEN_WIDTH
+        if self.rect.left < 0:
+            self.rect.left = 0
+        if self.rect.top < 0:
+            self.rect.top = 0
+        if self.rect.bottom > SCREEN_HEIGHT:
+            self.rect.bottom = SCREEN_HEIGHT
+
+    def powerup(self):
+        self.power += 1
+        self.power_time = pygame.time.get_ticks()
+
+    def shoot(self):
+        now = pygame.time.get_ticks()
+        if now - self.last_shot > self.shoot_delay:
+            self.last_shot = now
+            if self.power == 1:
+                bullet = Bullet(self.rect.centerx, self.rect.top)
+                all_sprites.add(bullet)
+                bullets.add(bullet)
+                shoot_sound.play()
+            if self.power >= 2:
+                bullet1 = Bullet(self.rect.left, self.rect.centery)
+                bullet2 = Bullet(self.rect.right, self.rect.centery)
+                all_sprites.add(bullet1)
+                all_sprites.add(bullet2)
+                bullets.add(bullet1)
+                bullets.add(bullet2)
+                shoot_sound.play()
+
+    def hide(self):
+        #Hide player temporarily
+        self.hidden = True
+        self.hide_timer = pygame.time.get_ticks()
+        self.rect.center = (SCREEN_WIDTH / 2, SCREEN_HEIGHT + 200)
+
+class Mob(pygame.sprite.Sprite):
+    def __init__(self):
+        pygame.sprite.Sprite.__init__(self)
+        self.image_orig = random.choice(meteor_images)
+#        self.image = pygame.transform.scale(self.image_orig, (50, 50))
+        self.image_orig.set_colorkey(BLACK)
+        self.image = self.image_orig.copy()
+        self.rect = self.image.get_rect()
+        self.radius = int(self.rect.width * .85 / 2)
+        self.rect.x = random.randrange(SCREEN_WIDTH - self.rect.width)
+        self.rect.bottom = random.randrange(-80, -20)
+        self.speedy = random.randrange(4, 8)
+        self.speedx = random.randrange(-1, 1)
+        self.rot = 0
+        self.rot_speed = random.randrange(-8, 8)
+        self.last_update = pygame.time.get_ticks()
+
+#    def rotate(self):
+#        now = pygame.time.get_ticks()
+#        if now - self.last_update > 50:
+#            self.last_update = now
+#            self.rot = (self.rot + self.rot_speed) % 360
+#            new_image = pygame.transform.rotate(self.image_orig, self.rot)
+#            old_center = self.rect.center
+#            self.image = new_image
+#            self.rect = self.image.get_rect()
+#            self.rect.center = old_center
+
+    def update(self):
+#        self.rotate()
+        self.rect.x += self.speedx
+        self.rect.y += self.speedy
+        if self.rect.top > SCREEN_HEIGHT + 10 or self.rect.left < -100 or self.rect.right > SCREEN_WIDTH + 100:
+            self.rect.x = random.randrange(SCREEN_WIDTH - self.rect.width)
+            self.rect.y = random.randrange(-100, -40)
+            self.speedy = random.randrange(1, 8)
+        if score >= 100:
+            self.kill()
+
+class SpecialMob(pygame.sprite.Sprite):
+    def __init__(self):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.transform.scale(spitfire_img, (60, 60))
+        self.image.set_colorkey(BLACK)
+        self.rect = self.image.get_rect()
+        self.radius = int(self.rect.width * .85 / 2)
+        self.rect.x = random.randrange(SCREEN_WIDTH - self.rect.width)
+        self.rect.bottom = random.randrange(-80, -20)
+        self.speedy = random.randrange(2, 3)
+        self.shoot_delay = 1000
+        self.last_shot = pygame.time.get_ticks()
+        #self.speedx = random.randrange(-2, 2)
+        self.last_update = pygame.time.get_ticks()
+
+    def update(self):
+        #self.rect.x += self.speedx
+        self.rect.y += self.speedy
+        if self.rect.top > SCREEN_HEIGHT + 10 or self.rect.left < -100 or self.rect.right > SCREEN_WIDTH + 100:
+            self.rect.x = random.randrange(SCREEN_WIDTH - self.rect.width)
+            self.rect.y = random.randrange(-100, -40)
+            self.speedy = random.randrange(1, 5)
+
+        now = pygame.time.get_ticks()
+        if now - self.last_shot > self.shoot_delay:
+            self.shoot()
+            self.last_shot = now
+
+    def shoot(self):
+        bullet = SpecialMobBullet(self.rect.centerx, self.rect.bottom)
+        all_sprites.add(bullet)
+        enemy_bullets.add(bullet)
+
+class Bullet(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = bullet_img
+        self.image.set_colorkey(BLACK)
+        self.rect = self.image.get_rect()
+        self.rect.bottom = y
+        self.rect.centerx = x
+        self.speedy = -10
+
+    def update(self):
+        self.rect.y += self.speedy
+        # kill if it moves off the top of the screen
+        if self.rect.bottom < 0:
+            self.kill()
+
+class Pow(pygame.sprite.Sprite):
+    def __init__(self, center):
+        pygame.sprite.Sprite.__init__(self)
+        self.type = random.choice(['shield', 'gun'])
+        self.image = powerup_images[self.type]
+        self.image.set_colorkey(BLACK)
+        self.rect = self.image.get_rect()
+        self.rect.center = center
+        self.speedy = 5
+
+    def update(self):
+        self.rect.y += self.speedy
+    #kill if moves off top of screen
+        if self.rect.top > SCREEN_HEIGHT:
+            self.kill
+
+class Explosion(pygame.sprite.Sprite):
+    def __init__(self, center, size):
+        pygame.sprite.Sprite.__init__(self)
+        self.size = size
+        self.image = explosion_anim[self.size][0]
+        self.rect = self.image.get_rect()
+        self.rect.center = center
+        self.frame = 0
+        self.last_update = pygame.time.get_ticks()
+        self.frame_rate = 75
+
+    def update(self):
+        now = pygame.time.get_ticks()
+        if now - self.last_update > self.frame_rate:
+            self.last_update = now
+            self.frame += 1
+            if self.frame == len(explosion_anim[self.size]):
+                self.kill()
+            else:
+                center = self.rect.center
+                self.image = explosion_anim[self.size][self.frame]
+                self.rect = self.image.get_rect()
+                self.rect.center = center
+
+class SpecialMobBullet(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.transform.scale(bullet_img, (10, 20))
+        self.image.set_colorkey(BLACK)
+        self.rect = self.image.get_rect()
+        self.rect.bottom = y
+        self.rect.centerx = x
+        self.speedy = 8
+
+    def update(self):
+        self.rect.y += self.speedy
+        if self.rect.top > SCREEN_HEIGHT:
+            self.kill()
+
+
+def draw_text(surf, text, size, x, y):
+    font = pygame.font.Font(font_name, size)
+    text_surface = font.render(text, True, WHITE)
+    text_rect = text_surface.get_rect()
+    text_rect.midtop = (x, y)
+    surf.blit(text_surface, text_rect)
+
+def newmob():
+    m = Mob()
+    all_sprites.add(m)
+    mobs.add(m)  # Pass the mob instance 'm' to the 'mobs' group
+
+def new_special_mob():
+    m = SpecialMob()
+    all_sprites.add(m)
+    mobs.add(m)
+
+def draw_shield_bar(surf, x, y, pct):
+    if pct < 0:
+        pct = 0
+    BAR_LENGTH = 200
+    BAR_HEIGHT = 20
+    fill = (pct / 100) * BAR_LENGTH
+    outline_rect = pygame.Rect(x, y, BAR_LENGTH, BAR_HEIGHT)
+    fill_rect = pygame.Rect(x, y, fill, BAR_HEIGHT)
+    pygame.draw.rect(surf, GREEN, fill_rect)
+    pygame.draw.rect(surf, BLACK, outline_rect, 2)
+
+def draw_lives(surf, x, y, lives, img):
+    for i in range(lives):
+        img_rect = img.get_rect()
+        img_rect.x = x + 30 * i
+        img_rect.y = y
+        surf.blit(img, img_rect)
+
+def draw_progress_bar(surf, x, y, score, level, threshold ):
+    score_in_level = score - (level - 1) * threshold
+    pct = (score_in_level / threshold) * 100
+    if pct < 0:
+        pct = 0
+    BAR_LENGTH = 200
+    BAR_HEIGHT = 20
+    fill = (pct / 100) * BAR_LENGTH
+    outline_rect = pygame.Rect(x, y, BAR_LENGTH, BAR_HEIGHT)
+    fill_rect = pygame.Rect(x, y, fill, BAR_HEIGHT)
+    pygame.draw.rect(surf, PURPLE, fill_rect)
+    pygame.draw.rect(surf, BLACK, outline_rect, 2)
+
+def spawn_squadron(x_start, y_start, spacing_x, spacing_y):
+    for i in range(3):
+        mob = SpecialMob()
+        mob.rect.x = x_start + i * spacing_x
+        mob.rect.y = y_start + i * spacing_y
+        all_sprites.add(mob)
+        special_mob_group.add(mob)
+
+def spawn_two_squadrons():
+    # First squadron (left side)
+    spawn_squadron(x_start=100, y_start=-100, spacing_x=60, spacing_y=0) #horisontal formation
+
+    # second squadtron (right side)
+    spawn_squadron(x_start=500, y_start=-200, spacing_x=60, spacing_y=0) #adjust start positions as needed
+
+# Function to display figher selection
+def display_fighter_selection():
+
+    screen.blit(flight1, (175, 525))
+    screen.blit(flight2, (375, 525))
+    screen.blit(flight3, (575, 525))
+
+    pygame.display.flip()
+
+
+
+
+def show_go_screen():
+    global scroll #make sure scroll is global so it can be shared between game states
+    waiting = True
+    while waiting:
+        screen.fill(BLACK)
+        for i in range(0, tiles):
+            screen.blit(background, (0, i * (-background_height) + scroll))
+        scroll += 1
+        if abs(scroll) > background_height:
+            scroll = 0
+
+   # screen.blit(background, background_rect)
+    draw_text(screen, "SHMUP!", 64, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 4)
+    draw_text(screen, "Arrow keys move, Space to fire", 22,
+              SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
+    draw_text(screen, "Select your fighter, to begin", 18, SCREEN_WIDTH / 2, SCREEN_HEIGHT * 3 / 5 )
+    draw_text(screen, "A", 20, SCREEN_WIDTH * 1 / 4, SCREEN_HEIGHT * 4 / 5)
+    draw_text(screen, "S", 20, SCREEN_WIDTH * 2 / 4, SCREEN_HEIGHT * 4 / 5)
+    draw_text(screen, "D", 20, SCREEN_WIDTH * 3 / 4, SCREEN_HEIGHT * 4 / 5)
+    draw_text(screen, "Press P for pause", 20, SCREEN_WIDTH * 4 / 4, SCREEN_HEIGHT * 4 / 5)
+
+    display_fighter_selection()
+#
+    pygame.display.flip()
+
+    #waiting = True
+    selected_fighter = None
+    while waiting:
+        clock.tick(FPS)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_a:
+                    selected_fighter = flight1_img
+                    waiting = False
+                elif event.key == pygame.K_s:
+                    selected_fighter = flight2_img
+                    waiting = False
+                elif event.key == pygame.K_d:
+                    selected_fighter = flight3_img
+                    waiting = False
+            #    waiting = False
+    return selected_fighter
+
+
+
+def show_level_up_screen():
+    screen.blit(background, background_rect)
+    draw_text(screen, "NEXT LEVEL!", 64, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
+
+    pygame.display.flip()
