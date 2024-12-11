@@ -1,0 +1,261 @@
+#SHOTEMUP
+
+
+import pygame
+import random
+import math
+from os import path
+
+from settings import*
+from sprites import*
+
+
+
+img_dir = path.join(path.dirname(__file__), 'img')
+snd_dir = path.join(path.dirname(__file__), 'snd')
+
+
+
+#initialize pygame and create window
+pygame.init()
+pygame.mixer.init()
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("SHOTEMDOWN")
+clock = pygame.time.Clock()
+
+font_name = pygame.font.match_font('arial')
+
+
+background = pygame.image.load(path.join(img_dir, "bakgrunn_brun1.png")).convert()    #load all game graphics
+background_height = background.get_width()
+background_rect = background.get_rect()
+scroll = 0
+background_height = background_rect.height
+
+tiles = math.ceil(SCREEN_HEIGHT / background_height) + 3
+
+flight1_img = pygame.image.load(path.join(img_dir, "ship_0004.png")).convert()
+flight1 = pygame.transform.scale(flight1_img, (50, 38))
+flight2_img = pygame.image.load(path.join(img_dir, "ship_0005.png")).convert()
+flight2 = pygame.transform.scale(flight2_img, (50, 38))
+flight3_img = pygame.image.load(path.join(img_dir, "ship_0006.png")).convert()
+flight3 = pygame.transform.scale(flight3_img, (50, 38))
+
+
+
+#player_mini_img = pygame.transform.scale(player_img, (25, 19))
+#player_mini_img.set_colorkey(BLACK)
+bullet_img = pygame.image.load(path.join(img_dir, "tile_0002.png")).convert()
+#meteor_images = []
+meteor_images = []
+meteor_list = ['ship_0023.png', 'ship_0021.png', 'ship_0021.png']
+
+
+for img in meteor_list:
+    meteor_images.append(pygame.image.load(path.join(img_dir, img)).convert())
+
+
+spitfire_img = pygame.image.load(path.join(img_dir, 'ship_0022.png')).convert()
+
+explosion_anim = {}
+explosion_anim['lg'] = []
+explosion_anim['sm'] = []
+
+for i in range(9):
+    filename = 'regularExplosion0{}.png'.format(i)
+    img = pygame.image.load(path.join(img_dir, filename)).convert()
+    img.set_colorkey(BLACK)
+    img_lg = pygame.transform.scale(img, (75, 75))
+    explosion_anim['lg'].append(img_lg)
+    img_sm = pygame.transform.scale(img, (32, 32))
+    explosion_anim['sm'].append(img_sm)
+    #filename = 'sonic'
+
+
+powerup_images = {}
+powerup_images['shield'] = pygame.image.load(path.join(img_dir, 'shield_gold.png')).convert()
+powerup_images['gun'] = pygame.image.load(path.join(img_dir, 'bolt_gold.png')).convert()
+
+# Load all game sounds
+shoot_sound = pygame.mixer.Sound(path.join(snd_dir, 'pew.wav'))
+shoot_sound.set_volume(0.2)
+
+#shield sound
+#power sound
+#expl_sounds
+#player_die sound
+
+pygame.mixer.music.load(path.join(snd_dir, '8bitgame1.mp3'))
+pygame.mixer.music.set_volume(0.4)
+pygame.mixer.music.play(loops=-1)
+
+                                                                       # Game loop
+game_over = True
+running = True
+level_up = False
+level = 1
+score = 0
+level_up_threshold = 100
+level_up_displayed = False
+level_up_time = 0
+level_up_duration = 2000
+paused = False # track if the game is paused
+
+
+while running:
+    if game_over:
+        selected_fighter = show_go_screen()
+        game_over = False
+        all_sprites = pygame.sprite.Group()
+        mobs = pygame.sprite.Group()
+        special_mob_group = pygame.sprite.Group()
+        #special_mob = pygame.sprite.Group()
+        bullets = pygame.sprite.Group()
+        powerups = pygame.sprite.Group()
+        enemy_bullets = pygame.sprite.Group()
+        special_mobs_spawned = False
+        player = Player(selected_fighter)
+        all_sprites.add(player)
+        for i in range(8):
+            newmob()
+        score = 0
+        special_mob_added = False
+        level_up = False
+        level_up_displayed = False
+
+    # keep looping running at the right speed
+    clock.tick(FPS)
+
+    #process input (events)   #check for closing window and pause state
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        if event.type == pygame.KEYUP:
+            if event.key == pygame.K_p:
+                paused = not paused
+                # toggle pause stat
+
+    screen.fill(BLACK)
+    for i in range(0, tiles):
+        screen.blit(background, (0, i * (-background_height) + scroll))
+    if not paused:
+        scroll += 1
+        if abs(scroll) > background_height:
+            scroll = 0
+
+# Handle pause
+    if paused:
+        draw_text(screen, "Paused", 64, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
+        pygame.display.flip()
+        continue
+
+
+    #update
+    all_sprites.update()
+
+    # check to see if a bullet hit a mob
+    hits = pygame.sprite.groupcollide(mobs, bullets, True, True)
+    for hit in hits:
+        score += 2
+        #score += 25 - hit.radius
+        expl = Explosion(hit.rect.center, 'lg')
+        all_sprites.add(expl)
+        if random.random() > 0.9:
+            pow = Pow(hit.rect.center)
+            all_sprites.add(pow)
+            powerups.add(pow)
+        newmob()
+
+    # check to see if a bullet hit a special mob
+    hits = pygame.sprite.groupcollide(special_mob_group, bullets, True, True)
+    for hit in hits:
+        score += 50
+                    # or adjust the score increment for special mobs
+        expl = Explosion(hit.rect.center, 'lg')
+        all_sprites.add(expl)
+
+
+#check to see if a mob hit the player
+    hits = pygame.sprite.spritecollide(player, mobs, True, pygame.sprite.collide_circle)
+    for hit in hits:
+        player.shield -= hit.radius * 2
+        expl = Explosion(hit.rect.center, 'sm')
+        all_sprites.add(expl)
+        if player.shield <= 0:
+            #oplayer die
+            death_explosion = Explosion(player.rect.center, 'player')
+            all_sprites.add(death_explosion)
+            player.hide()
+            player.lives -= 1
+            player.shield = 100
+
+# CHECK if player is hit by special mob bullets
+    hits = pygame.sprite.spritecollide(player, enemy_bullets, True, pygame.sprite.collide_rect)
+    for hit in hits:
+        player.shield -= 10
+        if player.shield <= 0:
+            death_explosion = Explosion(player.rect.center, 'player')
+            all_sprites.add(death_explosion)
+            player.hide()
+            player.lives -= 1
+            player.shield = 100
+
+# Check to see if player hit a powerup
+    hits = pygame.sprite.spritecollide(player, powerups, True)
+    for hit in hits:
+        if hit.type == 'shield':
+            player.shield += random.randrange(10, 30)
+            #shield_sound.play()
+            if player.shield >= 100:
+                player.shield = 100
+        if hit.type == 'gun':
+            player.powerup()
+            #power_sound.play()
+
+
+        # spawn special mob if score >= 100
+    if score >= 100 and not special_mob_added:
+        new_special_mob()
+        special_mob_added = True
+
+    # DIsplay level up message for as short time
+
+    if score >= level * level_up_threshold:
+        level += 1
+        level_up = True
+        level_up_time = pygame.time.get_ticks()
+        level_up_displayed = True
+
+    if score >= 100 and not special_mobs_spawned:
+        spawn_two_squadrons()
+        special_mobs_spawned = True
+
+    #Game over
+    if player.lives == 0 and not death_explosion.alive():
+        game_over = True
+
+
+                                                    #draw / render
+
+# Draw akk sprites and UI elements
+    all_sprites.draw(screen)
+    draw_text(screen, str(score), 18, SCREEN_WIDTH / 2, 10)
+    draw_shield_bar(screen, 5, 5, player.shield)
+    draw_lives(screen, SCREEN_WIDTH - 100, 5, player.lives, selected_fighter)
+    draw_progress_bar(screen, 5, 30, score, level, level_up_threshold)
+
+#Display level up
+    if level_up:
+        draw_text(screen, "NEXT LEVEL", 64, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
+        if pygame.time.get_ticks() - level_up_time >= level_up_duration:
+            level_up = False
+
+  #  if level_up:
+  #     print(f"Level up triggered. Time left: {pygame.time.get_ticks() - level_up_time}")
+
+    pygame.display.update()
+
+    # *after* drawing everything, flip the display
+    pygame.display.flip()
+
+pygame.quit()
